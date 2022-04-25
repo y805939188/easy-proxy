@@ -11,6 +11,7 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"path"
@@ -20,31 +21,84 @@ import (
 	"time"
 )
 
-func SetCertificateToSystemByCertPath(certPath string) error {
-	cwd, err := os.Getwd()
+func ParseLocalCertStringToCertificate(certPath string) (*x509.Certificate, error) {
+	currentCert, err := ioutil.ReadFile(certPath)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode([]byte(currentCert))
+	if block == nil {
+		return nil, fmt.Errorf("将证书文本转为 block 失败")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	return cert, nil
+}
+
+func RemoveCertificateFromSystemByCertName(certName string) error {
+	if certName == "" {
+		return nil
+	}
+	currentCertName := strings.Replace(certName, ".pem", "", 1)
+	currentCertName = strings.Replace(currentCertName, ".crt", "", 1)
+	currentCertName += ".crt"
+	certPath := consts.UbuntuCaCertificatesPath + "/" + currentCertName
+	err := tools.DeleteFile(certPath)
 	if err != nil {
 		return err
 	}
-
-	fileName := filepath.Base(certPath)
-	ext := path.Ext(fileName)
-	currentFileName := strings.Replace(fileName, ext, ".crt", 1)
-	err = tools.FileCopy(certPath, consts.UbuntuCaCertificatesPath+"/"+currentFileName)
+	err = ExecCertificateUpdateBash()
 	if err != nil {
 		return err
 	}
-
-	dir := cwd + "/certificate" + "/update-ca-certificates"
-
-	out, _ := tools.Bash("chmod u+x " + dir)
-	fmt.Println(out)
-
-	out, _ = tools.Bash(dir)
-	fmt.Println(out)
-
 	return nil
 }
 
+func ExecCertificateUpdateBash() error {
+	// cwd, err := os.Getwd()
+	// if err != nil {
+	// 	return err
+	// }
+	// file := cwd + "/certificate" + "/update-ca-certificates"
+	file := "./update-ca-certificates"
+	out, code := tools.Bash("chmod u+x " + file)
+	if code != 0 {
+		return fmt.Errorf(out)
+	}
+	fmt.Println(out)
+	out, code = tools.Bash(file)
+	if code != 0 {
+		return fmt.Errorf(out)
+	}
+	fmt.Println(out)
+	return nil
+}
+
+func GetSystemCertNameFromPath(certPath string) string {
+	fileName := filepath.Base(certPath)
+	ext := path.Ext(fileName)
+	currentFileName := strings.Replace(fileName, ext, ".crt", 1)
+	return currentFileName
+}
+
+func SetCertificateToSystemByCertPath(certPath string) error {
+	currentFileName := GetSystemCertNameFromPath(certPath)
+	err := tools.FileCopy(certPath, consts.UbuntuCaCertificatesPath+"/"+currentFileName)
+	if err != nil {
+		return err
+	}
+
+	err = ExecCertificateUpdateBash()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// https://serverfault.com/questions/18364/can-i-use-the-same-wildcard-certification-for-domain-com-and-domain-com
 func GenCertificate(domain string, path string) (string, string, error) {
 	if domain == "" {
 		return "", "", fmt.Errorf("domain is required")
@@ -109,7 +163,6 @@ func GenCertificate(domain string, path string) (string, string, error) {
 	}
 
 	derBytes, _ := x509.CreateCertificate(rand.Reader, &template, &template, &pk.PublicKey, pk)
-
 	certPath := currentPath + "/" + key + "cert" + ".pem"
 	certOut, _ := os.Create(certPath)
 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
@@ -122,87 +175,3 @@ func GenCertificate(domain string, path string) (string, string, error) {
 
 	return keyPath, certPath, nil
 }
-
-// func GenCertificate(domain string, path string, index string) (string, string, error) {
-
-// 	if domain == "" {
-// 		return "", "", fmt.Errorf("domain is required")
-// 	}
-
-// 	domain = strings.Replace(domain, "http://", "", 1)
-// 	domain = strings.Replace(domain, "https://", "", 1)
-
-// 	reg, err := regexp.Compile("\\.")
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-
-// 	key := reg.ReplaceAllString(domain, "_")
-
-// 	currentPath := "./"
-// 	if path != "" {
-// 		if string(path[len(path)-1]) == "/" {
-// 			currentPath = path[0 : len(path)-1]
-// 		} else {
-// 			currentPath = path
-// 		}
-// 	}
-
-// 	if key == "" {
-// 		return "", "", fmt.Errorf("key is error")
-// 	}
-
-// 	max := new(big.Int).Lsh(big.NewInt(1), 128)
-// 	serialNumber, err := rand.Int(rand.Reader, max)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-
-// 	// 定义：引用IETF的安全领域的公钥基础实施（PKIX）工作组的标准实例化内容
-// 	subject := pkix.Name{
-// 		Organization: []string{domain},
-// 		// OrganizationalUnit: []string{"client"},
-// 		// CommonName:         "",
-// 	}
-
-// 	// 设置 SSL证书的属性用途
-// 	certificate509 := x509.Certificate{
-// 		SerialNumber: serialNumber,
-// 		Subject:      subject,
-// 		NotBefore:    time.Now(),
-// 		NotAfter:     time.Now().Add(100 * 24 * time.Hour),
-// 		KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-// 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-// 		// IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
-// 	}
-
-// 	// 生成指定位数密匙
-// 	pk, err := rsa.GenerateKey(rand.Reader, 1024)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-
-// 	// 生成 SSL公匙
-// 	derBytes, err := x509.CreateCertificate(rand.Reader, &certificate509, &certificate509, &pk.PublicKey, pk)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-
-// 	certPath := currentPath + "/" + key + "cert" + index + ".pem"
-// 	certOut, err := os.Create(certPath)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-// 	pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
-// 	certOut.Close()
-
-// 	keyPath := currentPath + "/" + key + "key" + index + ".pem"
-// 	// 生成 SSL私匙
-// 	keyOut, err := os.Create(keyPath)
-// 	if err != nil {
-// 		return "", "", err
-// 	}
-// 	pem.Encode(keyOut, &pem.Block{Type: "RAS PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(pk)})
-// 	keyOut.Close()
-// 	return keyPath, certPath, nil
-// }
