@@ -3,14 +3,11 @@ package main
 import (
 	"easy-proxy/certificate"
 	myNet "easy-proxy/net"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/y805939188/dcommand"
@@ -22,49 +19,6 @@ type IUrl struct {
 	Address  string
 	Port     string
 	IsDomain bool
-}
-
-func checkStoreAddr(addr string) (*IUrl, error) {
-	if 0 == len(addr) {
-		return nil, fmt.Errorf("url 不能为空")
-	}
-	parse, err := url.Parse(addr)
-	if err != nil {
-		return nil, err
-	}
-
-	if "http" != parse.Scheme && "https" != parse.Scheme {
-		return nil, fmt.Errorf("url 必须包含 http 或 https 域名")
-	}
-	re := regexp.MustCompile(`^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)+([A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])$`)
-
-	u := strings.Split(parse.Host, ":")
-	fmt.Println(len(u), u)
-	var resUrl = &IUrl{
-		Scheam: parse.Scheme,
-	}
-	if len(u) == 1 {
-		resUrl.Address = u[0]
-	}
-	if parse.Scheme == "https" {
-		resUrl.IsHttps = true
-	}
-	if len(u) == 2 && len(u[1]) != 0 {
-		result := re.FindAllStringSubmatch(u[0], -1)
-		if result == nil {
-			return nil, errors.New("url 无效: " + u[0])
-		}
-
-		resUrl.Port = u[1]
-		return resUrl, nil
-	}
-
-	result := re.FindAllStringSubmatch(parse.Host, -1)
-	if result == nil {
-		return nil, errors.New("url illegal. err:" + parse.Host)
-	}
-
-	return nil, nil
 }
 
 func main() {
