@@ -5,6 +5,29 @@ import (
 	"os"
 )
 
+func CreateFile(filename string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		err = io.ErrShortWrite
+	}
+	if err1 := f.Close(); err == nil {
+		err = err1
+	}
+	return err
+}
+
+func CreateDir(dirName string) error {
+	err := os.MkdirAll(dirName, 0766)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func FileIsExisted(filename string) bool {
 	existed := true
 	if _, err := os.Stat(filename); os.IsNotExist(err) {

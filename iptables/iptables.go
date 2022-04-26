@@ -12,8 +12,8 @@ type Iptables struct {
 }
 
 type IP struct {
-	ip   string
-	port string
+	IP   string
+	Port string
 }
 
 func (i *Iptables) getOutputRuleArrFromSrcAndDst(srcIp, srcPort, dstIp, dstPort string) []string {
@@ -69,17 +69,17 @@ func (i *Iptables) SetIptablesOutputRule(srcIp, srcPort, dstIp, dstPort string) 
  * dst 必须带个 port, 如果没传的话默认给个 80
  */
 func (i *Iptables) SetIpToIp(src, dst IP) (func() error, error) {
-	srcIp := net.ParseIP(src.ip)
+	srcIp := net.ParseIP(src.IP)
 	if srcIp == nil {
 		return nil, fmt.Errorf("src ip is not a valid ip")
 	}
 
-	dstIp := net.ParseIP(dst.ip)
+	dstIp := net.ParseIP(dst.IP)
 	if dstIp == nil {
 		return nil, fmt.Errorf("dst ip is not a valid ip")
 	}
 
-	delFunc, err := i.SetIptablesOutputRule(src.ip, src.port, dst.ip, dst.port)
+	delFunc, err := i.SetIptablesOutputRule(src.IP, src.Port, dst.IP, dst.Port)
 
 	if err != nil {
 		return nil, err

@@ -1,6 +1,10 @@
 package tools
 
-import "os/exec"
+import (
+	"os"
+	"os/exec"
+	"syscall"
+)
 
 func Bash(cmd string) (out string, exitcode int) {
 	cmdobj := exec.Command("bash", "-c", cmd)
@@ -14,4 +18,22 @@ func Bash(cmd string) (out string, exitcode int) {
 		}
 	}
 	return string(output), 0
+}
+
+func ExecCommand(name string, cmdParams ...string) (int, error) {
+	cmd := exec.Command(name, cmdParams...)
+	cmd.Stdout = os.Stdout
+	err := cmd.Start()
+	if err != nil {
+		return -1, err
+	}
+	return cmd.Process.Pid, nil
+}
+
+func KillByPID(pid int) error {
+	err := syscall.Kill(pid, syscall.SIGINT)
+	if err != nil {
+		return err
+	}
+	return nil
 }

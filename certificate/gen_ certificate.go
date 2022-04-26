@@ -58,12 +58,10 @@ func RemoveCertificateFromSystemByCertName(certName string) error {
 }
 
 func ExecCertificateUpdateBash() error {
-	// cwd, err := os.Getwd()
-	// if err != nil {
-	// 	return err
-	// }
-	// file := cwd + "/certificate" + "/update-ca-certificates"
-	file := "./update-ca-certificates"
+	file, err := tools.GetUpdateSystemCaScriptPath()
+	if err != nil {
+		return err
+	}
 	out, code := tools.Bash("chmod u+x " + file)
 	if code != 0 {
 		return fmt.Errorf(out)
