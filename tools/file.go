@@ -2,8 +2,33 @@ package tools
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
 )
+
+func ReadFile(filePath string) ([]byte, error) {
+	content, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	return content, nil
+}
+
+func GetAllFile(pathname string) ([]string, error) {
+	rd, err := ioutil.ReadDir(pathname)
+	if err != nil {
+		return nil, err
+	}
+	s := []string{}
+
+	for _, fi := range rd {
+		if !fi.IsDir() {
+			fullName := pathname + "/" + fi.Name()
+			s = append(s, fullName)
+		}
+	}
+	return s, nil
+}
 
 func CreateFile(filename string, data []byte, perm os.FileMode) error {
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)

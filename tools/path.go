@@ -52,3 +52,20 @@ func GetTmpLocalServicePath() (string, error) {
 	}
 	return rootPaht + "/service" + "/" + consts.TmpLocalServiceBinaryName, nil
 }
+
+func GetTmpProxyInfoPath() (string, error) {
+	rootPaht, err := GetEasyRootPath()
+	if err != nil {
+		return "", err
+	}
+	return rootPaht + "/" + consts.TmpProxyInfoJsonDirName, nil
+}
+
+func GetTmpProxyInfoFilePath(id string) (string, error) {
+	proxyInfoPath, err := GetTmpProxyInfoPath()
+	if err != nil {
+		return "", err
+	}
+	fileName := proxyInfoPath + "/" + id + ".json"
+	return fileName, nil
+}

@@ -3,7 +3,8 @@ package main
 import (
 	mySvc "easy-proxy/binary_service"
 	"easy-proxy/certificate"
-	command "easy-proxy/command/set"
+	command "easy-proxy/command"
+	"os"
 
 	myNet "easy-proxy/net"
 	"easy-proxy/tools"
@@ -13,10 +14,10 @@ import (
 	"github.com/y805939188/dcommand"
 )
 
-func execProxy(operator string, source, target *myNet.IUrl) error {
-	fmt.Println("开始设置代理规则......")
+func execProxy(operator string, source, target *myNet.IUrl, ids ...string) error {
 	if operator == "set" {
-		p, err := command.CreateProxy()
+		fmt.Println("开始设置代理规则......")
+		p, err := command.GetSetProxy()
 		if err != nil {
 			return err
 		}
@@ -29,11 +30,26 @@ func execProxy(operator string, source, target *myNet.IUrl) error {
 			return err
 		}
 	} else if operator == "del" {
-
+		fmt.Println("正在删除规则......")
+		p, err := command.GetDelProxy()
+		if err != nil {
+			return nil
+		}
+		err = p.DeleteProxys(ids...)
+		if err != nil {
+			return err
+		}
 	} else if operator == "fresh" {
-		fmt.Println("执行 fresh")
+		fmt.Println("正在清空规则......")
 	} else if operator == "list" {
-		fmt.Println("执行 list")
+		p, err := command.GetListProxy()
+		if err != nil {
+			return err
+		}
+		err = p.List()
+		if err != nil {
+			return err
+		}
 	} else {
 		return fmt.Errorf(fmt.Sprintf("暂不支持的操作: %s", operator))
 	}
@@ -91,6 +107,17 @@ func initFiles() error {
 			return err
 		}
 	}
+
+	proxyInfoPath, err := tools.GetTmpProxyInfoPath()
+	if err != nil {
+		return err
+	}
+	if !tools.FileIsExisted(proxyInfoPath) {
+		err := tools.CreateDir(proxyInfoPath)
+		if err != nil {
+			return fmt.Errorf("创建 proxy info 目录失败")
+		}
+	}
 	return nil
 }
 
@@ -107,8 +134,7 @@ func main() {
 		Flag(&dcommand.FlagInfo{Name: "source", Short: "s"}).
 		Flag(&dcommand.FlagInfo{Name: "target", Short: "t"}).
 		Operator("del").
-		Flag(&dcommand.FlagInfo{Name: "source", Short: "s"}).
-		Flag(&dcommand.FlagInfo{Name: "target", Short: "t"}).
+		Flag(&dcommand.FlagInfo{Name: "id", Short: "id"}).
 		Operator("fresh").
 		Operator("list").
 		Handler(func(command string, fc *dcommand.DCommand) error {
@@ -127,12 +153,10 @@ func main() {
 			}
 			cmd := fc.GetCommandIfExist(command)
 			op := fc.GetOperatorIfExistByCommand(currentOperator, cmd)
-			sourceFlag := fc.GetFlagIfExistInOperatorByOperator("source", true, op)
-			targetFlag := fc.GetFlagIfExistInOperatorByOperator("target", true, op)
 			switch currentOperator {
 			case "set":
-				fallthrough
-			case "del":
+				sourceFlag := fc.GetFlagIfExistInOperatorByOperator("source", true, op)
+				targetFlag := fc.GetFlagIfExistInOperatorByOperator("target", true, op)
 				if !sourceFlag.Passed || !targetFlag.Passed {
 					return fmt.Errorf(fmt.Sprintf("%s 指令一定需要 %s & %s 参数", currentOperator, "-s", "-t"))
 				}
@@ -143,7 +167,6 @@ func main() {
 				if err != nil {
 					return err
 				}
-
 				if strings.HasPrefix(targetFlag.Params[0], "https://") {
 					return fmt.Errorf("暂不支持把请求代理到 https 服务")
 				}
@@ -154,8 +177,6 @@ func main() {
 				if err != nil {
 					return err
 				}
-				fmt.Println("这里的 sourceHost 是: ", sourceHost)
-				fmt.Println("这里的 targetHost 是: ", targetHost)
 				if targetHost.IsDomain {
 					return fmt.Errorf("target 暂不支持域名")
 				}
@@ -163,7 +184,18 @@ func main() {
 				if err != nil {
 					return err
 				}
-				break
+			case "del":
+				idFlag := fc.GetFlagIfExistInOperatorByOperator("id", true, op)
+				if !idFlag.Passed {
+					return fmt.Errorf("del 指令一定需要一个 -id 作为参数")
+				}
+				if len(idFlag.Params) == 0 {
+					return fmt.Errorf("-id 缺少参数")
+				}
+				err = execProxy(currentOperator, nil, nil, idFlag.Params...)
+				if err != nil {
+					return err
+				}
 			case "fresh":
 				fallthrough
 			case "list":
@@ -178,8 +210,9 @@ func main() {
 			return nil
 		})
 
-	// testCmd := "easy-proxy " + strings.Join(os.Args[1:], " ")
-	testCmd := "easy-proxy set -s https://www.baidu.com -t 127.0.0.1:13191"
+	testCmd := "easy-proxy " + strings.Join(os.Args[1:], " ")
+	// testCmd := "easy-proxy set -s https://www.baidu.com -t 127.0.0.1:13191"
+	// testCmd := "easy-proxy list"
 	fmt.Println("这里的 cmd 是: ", testCmd)
 	err = cmd.ExecuteStr(testCmd)
 	if err != nil {
