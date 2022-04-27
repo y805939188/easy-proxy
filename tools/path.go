@@ -38,19 +38,19 @@ func GetTmpCaPath() (string, error) {
 }
 
 func GetTmpLocalServiceRootPath() (string, error) {
-	rootPaht, err := GetEasyRootPath()
+	rootPath, err := GetEasyRootPath()
 	if err != nil {
 		return "", err
 	}
-	return rootPaht + "/" + consts.TmpLocalServiceBinaryName, nil
+	return rootPath + "/" + consts.TmpLocalServiceBinaryName, nil
 }
 
 func GetTmpLocalServicePath() (string, error) {
-	rootPaht, err := GetTmpLocalServiceRootPath()
+	rootPath, err := GetTmpLocalServiceRootPath()
 	if err != nil {
 		return "", err
 	}
-	return rootPaht + "/service" + "/" + consts.TmpLocalServiceBinaryName, nil
+	return rootPath + "/service" + "/" + consts.TmpLocalServiceBinaryName, nil
 }
 
 func GetTmpProxyInfoPath() (string, error) {

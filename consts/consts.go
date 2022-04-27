@@ -1,5 +1,6 @@
 package consts
 
+// TODO: other platform
 const UbuntuCaCertificatesPath = "/usr/local/share/ca-certificates"
 const UbuntuSystemtRootCaPath = "/etc/ssl/certs/ca-certificates.crt"
 const EasyProxyRootDirName = "tmp-easy-proxy"

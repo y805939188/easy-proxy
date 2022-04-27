@@ -30,6 +30,7 @@ type Rule struct {
 }
 
 type Identifier struct {
+	Schema        string
 	SourceAddress string
 	SourcePort    string
 	TargetAddress string
@@ -37,10 +38,12 @@ type Identifier struct {
 }
 
 type SetProxy struct {
-	iptClient         *myIpt.Iptables
-	delFunc           []*func() error
-	currentIdentifier string
-	rules             map[string]*Rule
+	iptClient             *myIpt.Iptables
+	delFunc               []*func() error
+	currentIdentifier     string
+	rules                 map[string]*Rule
+	tmpPIDs               []int
+	tmpIptablesRemoveFunc []*func() error
 }
 
 func VerifyAddrValid(addrs ...string) error {
@@ -111,7 +114,7 @@ func createLocalHttpsMiddleService(localPort, userTargetIp, tuserTargetPort, key
 	}
 
 	pid, err := _createService(userTargetIp, tuserTargetPort, localPort, certPath, keyPath)
-	return pid, nil
+	return pid, err
 }
 
 func (p *SetProxy) setCaInfo(cert, key string) {
@@ -162,6 +165,29 @@ func (p *SetProxy) setIptablesRule(srcIp, srcPort, targetIp, targetPort string) 
 	}
 }
 
+func (p *SetProxy) Fresh() error {
+	var err error
+	if p.tmpIptablesRemoveFunc != nil {
+		for _, removeFunc := range p.tmpIptablesRemoveFunc {
+			err = (*removeFunc)()
+			if err != nil {
+				fmt.Println("执行取消 iptables 规则函数失败, err: ", err.Error())
+			}
+		}
+	}
+
+	if p.tmpPIDs != nil {
+		for _, pid := range p.tmpPIDs {
+			err = tools.KillByPID(pid)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("干掉 pid: %d 失败, err: %s", pid, err.Error()))
+			}
+		}
+	}
+
+	return err
+}
+
 func (p *SetProxy) proxyHttpsIpToIp(srcIps []string, srcPort, targetIp, targetPort string, domain string) error {
 	if srcIps == nil {
 		return nil
@@ -186,10 +212,11 @@ func (p *SetProxy) proxyHttpsIpToIp(srcIps []string, srcPort, targetIp, targetPo
 			}
 
 			// 设置 iptables 规则, 把要被代理的 ip 以及 port 给代理到 127.0.0.1:port
-			_, err = p.iptClient.SetIpToIp(myIpt.IP{IP: srcIp, Port: srcPort}, myIpt.IP{IP: "127.0.0.1", Port: port})
+			removeFunc, err := p.iptClient.SetIpToIp(myIpt.IP{IP: srcIp, Port: srcPort}, myIpt.IP{IP: "127.0.0.1", Port: port})
 			if err != nil {
 				return err
 			}
+			p.tmpIptablesRemoveFunc = append(p.tmpIptablesRemoveFunc, &removeFunc)
 			p.setIptablesRule(srcIp, srcPort, "127.0.0.1", port)
 
 			// 创建一个本地的 https://127.0.0.1:port 的服务用来代理
@@ -200,6 +227,7 @@ func (p *SetProxy) proxyHttpsIpToIp(srcIps []string, srcPort, targetIp, targetPo
 			p.setPort(port)
 			if pid > 0 {
 				p.setPID(pid)
+				p.tmpPIDs = append(p.tmpPIDs, pid)
 			}
 		}
 	} else {
@@ -249,6 +277,7 @@ func (p *SetProxy) proxyHttpIpToIp(srcIps []string, srcPort, targetIp, targetPor
 		if err != nil {
 			return err
 		}
+		p.setIptablesRule(srcIp, srcPort, targetIp, targetPort)
 		if p.delFunc == nil {
 			p.delFunc = [](*func() error){
 				&del,
@@ -321,7 +350,8 @@ func (p *SetProxy) checkProxyInfoExist(id string) bool {
 
 func (p *SetProxy) TransformIdentifierToStr(id *Identifier) string {
 	return fmt.Sprintf(
-		"%s-%s-%s-%s",
+		"%s-%s-%s-%s-%s",
+		id.Schema,
 		id.SourceAddress,
 		id.SourcePort,
 		id.TargetAddress,
@@ -340,7 +370,11 @@ func (p *SetProxy) ProxyIpToIp(isHttps bool, srcIp, srcPort, targetIp, targetPor
 		TargetAddress: targetIp,
 		TargetPort:    targetPort,
 	}
-
+	if isHttps {
+		id.Schema = "https"
+	} else {
+		id.Schema = "http"
+	}
 	idStr := tools.Sha1(p.TransformIdentifierToStr(id))
 	if p.checkProxyInfoExist(idStr) {
 		return fmt.Errorf("该规则已经存在")
@@ -372,11 +406,29 @@ func (p *SetProxy) ProxyDomainToIp(isHttps bool, srcDomain, srcPort, targetIp, t
 		return err
 	}
 
+	currentIpList := []string{}
+	for _, ip := range ipList {
+		_, v := myNet.VerifyIP(ip)
+		if v == 0 {
+			continue
+		}
+		if v == 4 {
+			currentIpList = append(currentIpList, ip)
+		} else {
+			fmt.Println("当前暂不支持 ipv6 模式, 将自动忽略")
+		}
+	}
+
 	id := &Identifier{
 		SourceAddress: srcDomain,
 		SourcePort:    srcPort,
 		TargetAddress: targetIp,
 		TargetPort:    targetPort,
+	}
+	if isHttps {
+		id.Schema = "https"
+	} else {
+		id.Schema = "http"
 	}
 	idStr := tools.Sha1(p.TransformIdentifierToStr(id))
 	if p.checkProxyInfoExist(idStr) {
@@ -388,7 +440,7 @@ func (p *SetProxy) ProxyDomainToIp(isHttps bool, srcDomain, srcPort, targetIp, t
 	}
 	originId := p.currentIdentifier
 	p.currentIdentifier = idStr
-	err = p.proxyIpsToIp(isHttps, ipList, srcPort, targetIp, targetPort, srcDomain)
+	err = p.proxyIpsToIp(isHttps, currentIpList, srcPort, targetIp, targetPort, srcDomain)
 	p.currentIdentifier = originId
 	if err != nil {
 		return err
@@ -403,8 +455,10 @@ func GetSetProxy() (*SetProxy, error) {
 		return nil, err
 	}
 	p := &SetProxy{
-		iptClient: iptClient,
-		rules:     make(map[string]*Rule),
+		iptClient:             iptClient,
+		rules:                 make(map[string]*Rule),
+		tmpPIDs:               []int{},
+		tmpIptablesRemoveFunc: []*func() error{},
 	}
 	return p, nil
 }

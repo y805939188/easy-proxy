@@ -4,7 +4,17 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 )
+
+func GetFileNameAndExt(filePath string) (string, string) {
+	fileName := filepath.Base(filePath)
+	ext := path.Ext(fileName)
+	fileName = strings.Replace(fileName, ext, "", 1)
+	return fileName, ext
+}
 
 func ReadFile(filePath string) ([]byte, error) {
 	content, err := ioutil.ReadFile(filePath)

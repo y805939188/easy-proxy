@@ -21,9 +21,9 @@ func TestMain(m *testing.M) {
 		"-user-port",
 		"6666",
 		"-cert",
-		"/root/tmp-easy-proxy/tmp-ca/www_baidu_comcert.pem",
+		"./test_ca/127_0_0_1cert.pem",
 		"-key",
-		"/root/tmp-easy-proxy/tmp-ca/www_baidu_comkey.pem",
+		"./test_ca/127_0_0_1key.pem",
 	)
 	cmd.Stdout = os.Stdout
 	err := cmd.Start()

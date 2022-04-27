@@ -27,20 +27,35 @@ func execProxy(operator string, source, target *myNet.IUrl, ids ...string) error
 			err = p.ProxyIpToIp(source.IsHttps, source.Address, source.Port, target.Address, target.Port)
 		}
 		if err != nil {
+			_err := p.Fresh()
+			if _err != nil {
+				fmt.Println(err)
+			}
 			return err
 		}
+		fmt.Println("完成!")
 	} else if operator == "del" {
 		fmt.Println("正在删除规则......")
 		p, err := command.GetDelProxy()
 		if err != nil {
-			return nil
+			return err
 		}
 		err = p.DeleteProxys(ids...)
 		if err != nil {
 			return err
 		}
+		fmt.Println("完成!")
 	} else if operator == "fresh" {
 		fmt.Println("正在清空规则......")
+		p, err := command.GetFreshProxy()
+		if err != nil {
+			return err
+		}
+		err = p.FreshAll()
+		if err != nil {
+			return err
+		}
+		fmt.Println("完成!")
 	} else if operator == "list" {
 		p, err := command.GetListProxy()
 		if err != nil {
@@ -53,7 +68,6 @@ func execProxy(operator string, source, target *myNet.IUrl, ids ...string) error
 	} else {
 		return fmt.Errorf(fmt.Sprintf("暂不支持的操作: %s", operator))
 	}
-	fmt.Println("完成!")
 	return nil
 }
 
@@ -95,13 +109,13 @@ func initFiles() error {
 	if err != nil {
 		return err
 	}
+	// 拷贝启动本地代理服务器的二进制到临时目录下
+	// svcRootPath 是这个二进制文件的父级目录
+	svcRootPath, err := tools.GetTmpLocalServiceRootPath()
+	if err != nil {
+		return err
+	}
 	if !tools.FileIsExisted(servicePath) {
-		// 拷贝启动本地代理服务器的二进制到临时目录下
-		// svcRootPath 是这个二进制文件的父级目录
-		svcRootPath, err := tools.GetTmpLocalServicePath()
-		if err != nil {
-			return err
-		}
 		err = mySvc.RestoreAssets(svcRootPath, "service")
 		if err != nil {
 			return err
@@ -211,9 +225,8 @@ func main() {
 		})
 
 	testCmd := "easy-proxy " + strings.Join(os.Args[1:], " ")
-	// testCmd := "easy-proxy set -s https://www.baidu.com -t 127.0.0.1:13191"
-	// testCmd := "easy-proxy list"
-	fmt.Println("这里的 cmd 是: ", testCmd)
+	// testCmd := "easy-proxy set -s http://www.baidu.com -t 127.0.0.1:3000"
+	// testCmd := "easy-proxy set -s https://www.baidu.com -t 127.0.0.1:3000"
 	err = cmd.ExecuteStr(testCmd)
 	if err != nil {
 		fmt.Println(err.Error())

@@ -10,22 +10,32 @@ import (
 )
 
 func TestCertificate(t *testing.T) {
+	test := "127.0.0.1"
+	keyPath, certPath, erro := certificate.GenCertificate(test, "./")
+	if erro != nil {
+		panic("生成证书出错, err: " + erro.Error())
+	}
+
+	erro = certificate.SetCertificateToSystemByCertPath(certPath)
+	if erro != nil {
+		panic("将证书添加到系统受信任失败, err: " + erro.Error())
+	}
+
+	return
+
 	testDomain := "www.ding-test.com"
 
 	keyPath, certPath, err := certificate.GenCertificate(testDomain, "./")
 	if err != nil {
-		fmt.Println("生成证书出错, err: ", err.Error())
-		return
+		panic("生成证书出错, err: " + err.Error())
 	}
 	exist := tools.FileIsExisted(keyPath)
 	if !exist {
-		fmt.Println("证书私钥文件不存在")
-		return
+		panic("证书私钥文件不存在")
 	}
 	exist = tools.FileIsExisted(certPath)
 	if !exist {
-		fmt.Println("证书不存在")
-		return
+		panic("证书不存在")
 	}
 
 	defer func() {
@@ -36,8 +46,7 @@ func TestCertificate(t *testing.T) {
 
 	err = certificate.SetCertificateToSystemByCertPath(certPath)
 	if err != nil {
-		fmt.Println("将证书添加到系统受信任失败, err: ", err.Error())
-		return
+		panic("将证书添加到系统受信任失败, err: " + err.Error())
 	}
 
 	currentFileName := certificate.GetSystemCertNameFromPath(certPath)
@@ -45,8 +54,7 @@ func TestCertificate(t *testing.T) {
 
 	exist = tools.FileIsExisted(systemCertPath)
 	if !exist {
-		fmt.Println("将证书添加到 " + consts.UbuntuCaCertificatesPath + " 失败")
-		return
+		panic("将证书添加到 " + consts.UbuntuCaCertificatesPath + " 失败")
 	}
 
 	systemCertPool, err := x509.SystemCertPool()
@@ -54,7 +62,7 @@ func TestCertificate(t *testing.T) {
 		fmt.Println("通过 x509 获取系统证书池失败, err: ", err.Error())
 		err = certificate.RemoveCertificateFromSystemByCertName(currentFileName)
 		if err != nil {
-			fmt.Println("从系统中移除证书失败, err: ", err.Error())
+			panic("从系统中移除证书失败, err: " + err.Error())
 		}
 		return
 	}
@@ -64,7 +72,7 @@ func TestCertificate(t *testing.T) {
 		fmt.Println("将文本证书转为结构体失败, err: ", err.Error())
 		err = certificate.RemoveCertificateFromSystemByCertName(currentFileName)
 		if err != nil {
-			fmt.Println("从系统中移除证书失败, err: ", err.Error())
+			panic("从系统中移除证书失败, err: " + err.Error())
 		}
 		return
 	}
@@ -78,13 +86,13 @@ func TestCertificate(t *testing.T) {
 		fmt.Println("校验证书失败, err: ", err.Error())
 		err = certificate.RemoveCertificateFromSystemByCertName(currentFileName)
 		if err != nil {
-			fmt.Println("从系统中移除证书失败, err: ", err.Error())
+			panic("从系统中移除证书失败, err: " + err.Error())
 		}
 		return
 	}
 	fmt.Println("成功将证书添加为系统受信任")
 	err = certificate.RemoveCertificateFromSystemByCertName(currentFileName)
 	if err != nil {
-		fmt.Println("从系统中移除证书失败, err: ", err.Error())
+		panic("从系统中移除证书失败, err: " + err.Error())
 	}
 }

@@ -2,23 +2,48 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 
 	"github.com/y805939188/dcommand"
 )
 
+// NewProxy 拿到 targetHost 后, 创建一个反向代理
+func NewProxy(targetHost string) (*httputil.ReverseProxy, error) {
+	url, err := url.Parse(targetHost)
+	if err != nil {
+		return nil, err
+	}
+
+	return httputil.NewSingleHostReverseProxy(url), nil
+}
+
+// ProxyRequestHandler 使用 proxy 处理请求
+func ProxyRequestHandler(proxy *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		proxy.ServeHTTP(w, r)
+	}
+}
+
 func startHttpsService(userTargetIp, userTargetPort string, port string, certPath, keyPath string) error {
-	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		fmt.Println("ding test")
-		io.WriteString(w, "Hello, TLS!\n")
-	})
+	if userTargetPort == "" {
+		userTargetPort = "80"
+	}
 
-	err := http.ListenAndServeTLS(":"+port, certPath, keyPath, nil)
+	// 初始化反向代理并传入真正后端服务的地址
+	proxy, err := NewProxy(fmt.Sprintf("http://%s:%s", userTargetIp, userTargetPort))
+	if err != nil {
+		return err
+	}
+
+	// 使用 proxy 处理所有请求到真正的服务
+	http.HandleFunc("/", ProxyRequestHandler(proxy))
+
+	err = http.ListenAndServeTLS(":"+port, certPath, keyPath, nil)
 	fmt.Println("创建服务发生错误, err: ", err.Error())
-
 	return err
 }
 
@@ -115,6 +140,8 @@ func main() {
 		})
 
 	testCmd := "easy-proxy-service " + strings.Join(os.Args[1:], " ")
+
+	// testCmd := "easy-proxy-service start -ip 127.0.0.1 -port 13191 -user-ip 1.1.1.1 -user-port 6666 -cert ./test_ca/127_0_0_1cert.pem -key ./test_ca/127_0_0_1key.pem"
 	err := cmd.ExecuteStr(testCmd)
 	if err != nil {
 		fmt.Println(err.Error())
