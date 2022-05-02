@@ -1,75 +1,18 @@
 package main
 
 import (
-	mySvc "easy-proxy/binary_service"
-	"easy-proxy/certificate"
-	command "easy-proxy/command"
-	"os"
-
-	myNet "easy-proxy/net"
-	"easy-proxy/tools"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/y805939188/dcommand"
-)
 
-func execProxy(operator string, source, target *myNet.IUrl, ids ...string) error {
-	if operator == "set" {
-		fmt.Println("开始设置代理规则......")
-		p, err := command.GetSetProxy()
-		if err != nil {
-			return err
-		}
-		if source.IsDomain {
-			err = p.ProxyDomainToIp(source.IsHttps, source.Address, source.Port, target.Address, target.Port)
-		} else {
-			err = p.ProxyIpToIp(source.IsHttps, source.Address, source.Port, target.Address, target.Port)
-		}
-		if err != nil {
-			_err := p.Fresh()
-			if _err != nil {
-				fmt.Println(err)
-			}
-			return err
-		}
-		fmt.Println("完成!")
-	} else if operator == "del" {
-		fmt.Println("正在删除规则......")
-		p, err := command.GetDelProxy()
-		if err != nil {
-			return err
-		}
-		err = p.DeleteProxys(ids...)
-		if err != nil {
-			return err
-		}
-		fmt.Println("完成!")
-	} else if operator == "fresh" {
-		fmt.Println("正在清空规则......")
-		p, err := command.GetFreshProxy()
-		if err != nil {
-			return err
-		}
-		err = p.FreshAll()
-		if err != nil {
-			return err
-		}
-		fmt.Println("完成!")
-	} else if operator == "list" {
-		p, err := command.GetListProxy()
-		if err != nil {
-			return err
-		}
-		err = p.List()
-		if err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf(fmt.Sprintf("暂不支持的操作: %s", operator))
-	}
-	return nil
-}
+	mySvc "easy-proxy/binary_service"
+	"easy-proxy/certificate"
+	myCommand "easy-proxy/command"
+	myNet "easy-proxy/net"
+	"easy-proxy/tools"
+)
 
 func initFiles() error {
 	easyProxyRootPath, err := tools.GetEasyRootPath()
@@ -194,7 +137,7 @@ func main() {
 				if targetHost.IsDomain {
 					return fmt.Errorf("target 暂不支持域名")
 				}
-				err = execProxy(currentOperator, sourceHost, targetHost)
+				err = myCommand.ExecSetCommand(sourceHost, targetHost)
 				if err != nil {
 					return err
 				}
@@ -206,14 +149,17 @@ func main() {
 				if len(idFlag.Params) == 0 {
 					return fmt.Errorf("-id 缺少参数")
 				}
-				err = execProxy(currentOperator, nil, nil, idFlag.Params...)
+				err = myCommand.ExecDelCommand(idFlag.Params...)
 				if err != nil {
 					return err
 				}
 			case "fresh":
-				fallthrough
+				err := myCommand.ExecFreshCommand()
+				if err != nil {
+					return err
+				}
 			case "list":
-				err := execProxy(currentOperator, nil, nil)
+				err := myCommand.ExecListCommand()
 				if err != nil {
 					return err
 				}
@@ -225,8 +171,6 @@ func main() {
 		})
 
 	testCmd := "easy-proxy " + strings.Join(os.Args[1:], " ")
-	// testCmd := "easy-proxy set -s http://www.baidu.com -t 127.0.0.1:3000"
-	// testCmd := "easy-proxy set -s https://www.baidu.com -t 127.0.0.1:3000"
 	err = cmd.ExecuteStr(testCmd)
 	if err != nil {
 		fmt.Println(err.Error())

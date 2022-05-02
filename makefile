@@ -6,6 +6,7 @@ build_cli:
 	go build .
 
 build_ubuntu:
+	rm -rf /usr/local/bin/easy-proxy
 	go build .
 	ln ./easy-proxy /usr/local/bin/
 
