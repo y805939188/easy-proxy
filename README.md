@@ -5,7 +5,7 @@
 ---
 ### 相关连接
 [浅入浅出 iptables](https://zhuanlan.zhihu.com/p/507786224)</br>
-[基于 iptables 实现一个 https 代理工具](https://zhuanlan.zhihu.co)</br>
+[基于 iptables 实现一个 https 代理工具](https://zhuanlan.zhihu.com/p/507883101)</br>
 
 ---
 
